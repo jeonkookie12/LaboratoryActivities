@@ -15,17 +15,55 @@ export class PostsService {
   ) {}
 
   async findAll(): Promise<Post[]> {
-    return this.postsRepository.find({
-      relations: ['author', 'comments', 'comments.author'],
-      order: { createdAt: 'DESC' },
-    });
+    return this.postsRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('post.comments', 'comment')
+      .leftJoinAndSelect('comment.author', 'commentAuthor')
+      .select([
+        'post.id',
+        'post.title',
+        'post.body',
+        'post.color',
+        'post.createdAt',
+        'post.updatedAt',
+        'author.id',
+        'author.username',
+        'comment.id',
+        'comment.body',
+        'comment.createdAt',
+        'commentAuthor.id',
+        'commentAuthor.username',
+      ])
+      .orderBy('post.createdAt', 'DESC')
+      .getMany();
   }
 
   async findOne(id: string): Promise<Post> {
-    const post = await this.postsRepository.findOne({
-      where: { id },
-      relations: ['author', 'comments', 'comments.author'],
-    });
+    const post = await this.postsRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('post.comments', 'comment')
+      .leftJoinAndSelect('comment.author', 'commentAuthor')
+      .select([
+        'post.id',
+        'post.title',
+        'post.body',
+        'post.color',
+        'post.createdAt',
+        'post.updatedAt',
+        'author.id',
+        'author.username',
+        'comment.id',
+        'comment.body',
+        'comment.createdAt',
+        'commentAuthor.id',
+        'commentAuthor.username',
+      ])
+      .where('post.id = :id', { id })
+      .orderBy('comment.createdAt', 'ASC')
+      .getOne();
+
     if (!post) {
       throw new NotFoundException(`Post with ID ${id} not found`);
     }
