@@ -176,7 +176,6 @@ function App() {
     if (page === "private") setPage("dashboard");
   };
 
-  // Reset unlock on logout
   useEffect(() => {
     if (!loggedIn) {
       setPrivateUnlocked(false);
@@ -864,7 +863,6 @@ function App() {
         }
       `}</style>
 
-      {/* --- NEW: Private Password Modal --- */}
       {showPrivateModal && (
         <div className="fixed inset-0 bg-black/30 bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
