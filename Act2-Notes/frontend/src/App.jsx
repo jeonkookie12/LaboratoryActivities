@@ -3,22 +3,16 @@ import React, { useState, useRef, useEffect } from "react";
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3000";
 
 function App() {
-  // --- Auth + validation ---
   const [loggedIn, setLoggedIn] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
-
   const [name, setName] = useState("");
   const [emailAuth, setEmailAuth] = useState("");
   const [passwordAuth, setPasswordAuth] = useState("");
   const [confirmPasswordAuth, setConfirmPasswordAuth] = useState("");
-
   const [errors, setErrors] = useState({ name: "", email: "", password: "", confirm: "" });
   const [touched, setTouched] = useState({ name: false, email: false, password: false, confirm: false });
-
   const [showPasswordHeld, setShowPasswordHeld] = useState(false);
-
-  // --- Notes app state ---
-  const [page, setPage] = useState("dashboard"); // 'dashboard' or 'private'
+  const [page, setPage] = useState("dashboard"); 
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState([]);
   const [privateNotes, setPrivateNotes] = useState([]);
@@ -34,10 +28,17 @@ function App() {
     list: false
   });
 
+  // --- NEW: Private Notes Password Modal State ---
+  const [showPrivateModal, setShowPrivateModal] = useState(false);
+  const [privatePwd, setPrivatePwd] = useState("");
+  const [privateConfirm, setPrivateConfirm] = useState("");
+  const [privateMode, setPrivateMode] = useState("enter"); // "enter" | "create"
+  const [privateError, setPrivateError] = useState("");
+  const [privateUnlocked, setPrivateUnlocked] = useState(false);
+
   const editorRef = useRef(null);
   const menuRef = useRef(null);
 
-  // Check for existing token on app load
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
@@ -47,7 +48,6 @@ function App() {
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      // close only if clicking outside any open menu
       if (!e.target.closest(".note-menu")) {
         setOpenMenuId(null);
       }
@@ -56,16 +56,12 @@ function App() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-
-  // load notes on mount if logged in
   useEffect(() => {
     if (loggedIn) {
       fetchNotes();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggedIn]);
 
-  // Update formatting state when editor content changes
   useEffect(() => {
     const updateFormattingState = () => {
       if (!editorRef.current) return;
@@ -100,7 +96,93 @@ function App() {
     };
   }, [showForm]);
 
-  // ---------------- Validation helpers ----------------
+
+
+  const openPrivateModal = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}/auth/validate-private-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password: '' }), 
+      });
+      const data = await res.json();
+      setPrivateMode(data.message === 'No private password set' ? 'create' : 'enter');
+    } catch {
+      setPrivateMode('create');
+    }
+    setShowPrivateModal(true);
+    setPrivateError('');
+  };
+
+  const submitPrivatePassword = async () => {
+    setPrivateError('');
+    const token = localStorage.getItem('token');
+
+    try {
+      if (privateMode === 'create') {
+        if (privatePwd.length < 6) throw new Error('Password must be ≥6 chars');
+        if (privatePwd !== privateConfirm) throw new Error('Passwords do not match');
+
+        const res = await fetch(`${API_BASE}/auth/set-private-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ password: privatePwd, confirm: privateConfirm }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed');
+        }
+
+        setPrivateUnlocked(true);
+        setShowPrivateModal(false);
+        setPage('private');
+      } else {
+        const res = await fetch(`${API_BASE}/auth/validate-private-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ password: privatePwd }),
+        });
+        const data = await res.json();
+        if (data.valid) {
+          setPrivateUnlocked(true);
+          setShowPrivateModal(false);
+          setPage('private');
+        } else {
+          setPrivateError(data.message || 'Incorrect password');
+        }
+      }
+      setPrivatePwd('');
+      setPrivateConfirm('');
+    } catch (e) {
+      setPrivateError(e.message);
+    }
+  };
+
+  const closePrivateModal = () => {
+    setShowPrivateModal(false);
+    setPrivatePwd("");
+    setPrivateConfirm("");
+    setPrivateError("");
+    if (page === "private") setPage("dashboard");
+  };
+
+  // Reset unlock on logout
+  useEffect(() => {
+    if (!loggedIn) {
+      setPrivateUnlocked(false);
+    }
+  }, [loggedIn]);
+
   const nameValid = (v) => {
     if (!v.trim()) return "Name is required.";
     if (!/^[A-Za-z\s]+$/.test(v)) return "Name should contain only letters and spaces.";
@@ -121,7 +203,6 @@ function App() {
     return "";
   };
 
-  // input handlers (mark touched on blur)
   const handleNameChange = (v) => {
     setName(v);
     setErrors((p) => ({ ...p, name: nameValid(v) }));
@@ -153,7 +234,6 @@ function App() {
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
-    // validate
     const newErrors = {
       name: isRegister ? nameValid(name) : "",
       email: emailValid(emailAuth),
@@ -162,7 +242,6 @@ function App() {
     };
     setErrors(newErrors);
 
-    // show all touched so user sees messages
     setTouched({ name: true, email: true, password: true, confirm: true });
 
     const hasError = Object.values(newErrors).some((x) => x && x.length > 0);
@@ -192,7 +271,7 @@ function App() {
         throw new Error("No access token received");
       }
       
-      localStorage.setItem("token", access_token); // Store JWT token
+      localStorage.setItem("token", access_token); 
       setLoggedIn(true);
       setName("");
       setEmailAuth("");
@@ -206,7 +285,6 @@ function App() {
     }
   };
 
-  // ---------------- Backend API functions ----------------
   async function fetchNotes() {
     try {
       const token = localStorage.getItem("token");
@@ -223,7 +301,6 @@ function App() {
       });
       
       if (res.status === 401) {
-        // Token is invalid
         localStorage.removeItem("token");
         setLoggedIn(false);
         return;
@@ -231,7 +308,6 @@ function App() {
 
       if (!res.ok) throw new Error("Failed to fetch notes");
       const data = await res.json();
-      // partition by is_private flag
       const publicList = data.filter((n) => !n.is_private);
       const privateList = data.filter((n) => n.is_private);
       setNotes(publicList);
@@ -245,7 +321,7 @@ function App() {
   const addNote = async () => {
     const content = editorRef.current?.innerHTML || "";
     if (!title.trim() || !content.trim()) {
-      alert("⚠️ Please enter title and content!");
+      alert("Please enter title and content!");
       return;
     }
 
@@ -265,7 +341,6 @@ function App() {
       }
 
       if (activeNote) {
-        // update
         const res = await fetch(`${API_BASE}/notes/${activeNote.id}`, {
           method: "PUT",
           headers: {
@@ -282,7 +357,6 @@ function App() {
           setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
         }
       } else {
-        // create
         const res = await fetch(`${API_BASE}/notes`, {
           method: "POST",
           headers: {
@@ -309,7 +383,6 @@ function App() {
   const deleteNote = async (note, isPrivateNote) => {
     console.log("Deleting note:", note.id, "isPrivate:", isPrivateNote);
     
-    // Store for undo before attempting delete
     setUndoNote({ note, isPrivateNote });
     
     try {
@@ -332,7 +405,6 @@ function App() {
         throw new Error(`Delete failed: ${errorText}`);
       }
       
-      // Remove from UI only after successful API call
       if (isPrivateNote) {
         setPrivateNotes((prev) => prev.filter((n) => n.id !== note.id));
       } else {
@@ -343,7 +415,6 @@ function App() {
     } catch (err) {
       console.error("deleteNote error:", err);
       alert(`Could not delete note: ${err.message}`);
-      // Remove undo option if delete failed
       setUndoNote(null);
     }
   };
@@ -419,13 +490,10 @@ function App() {
       const updated = await res.json();
       console.log("Note moved successfully:", updated);
 
-      // Remove from current lists
       if (page === "private") {
-        // Moving from private to public
         setPrivateNotes((prev) => prev.filter((n) => n.id !== note.id));
         setNotes((prev) => [updated, ...prev]);
       } else {
-        // Moving from public to private
         setNotes((prev) => prev.filter((n) => n.id !== note.id));
         setPrivateNotes((prev) => [updated, ...prev]);
       }
@@ -482,7 +550,6 @@ function App() {
       editorRef.current.focus();
       document.execCommand(cmd, false, null);
       
-      // Update formatting state immediately
       setActiveFormatting({
         ...activeFormatting,
         bold: cmd === 'bold' ? !activeFormatting.bold : activeFormatting.bold,
@@ -510,7 +577,6 @@ function App() {
     return sorted;
   };
 
-  // ---------------- UI ----------------
   if (!loggedIn) {
     return (
       <>
@@ -645,7 +711,7 @@ function App() {
                     onTouchEnd={onShowPasswordRelease}
                     className="bg-transparent border-none cursor-pointer p-2 text-lg"
                   >
-                    {showPasswordHeld ? "🙈" : "👁️"}
+                    {showPasswordHeld ? "Hidden" : "Visible"}
                   </button>
                 </div>
                 {touched.password && errors.password ? (
@@ -797,6 +863,52 @@ function App() {
           }
         }
       `}</style>
+
+      {/* --- NEW: Private Password Modal --- */}
+      {showPrivateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">
+              {privateMode === "create" ? "Set Private Notes Password" : "Enter Private Notes Password"}
+            </h3>
+            <div className="space-y-3">
+              <input
+                type="password"
+                value={privatePwd}
+                onChange={(e) => setPrivatePwd(e.target.value)}
+                placeholder={privateMode === "create" ? "New password (6+ chars)" : "Enter password"}
+                className="w-full p-2.5 border border-blue-100 rounded-lg"
+                autoFocus
+              />
+              {privateMode === "create" && (
+                <input
+                  type="password"
+                  value={privateConfirm}
+                  onChange={(e) => setPrivateConfirm(e.target.value)}
+                  placeholder="Confirm password"
+                  className="w-full p-2.5 border border-blue-100 rounded-lg"
+                />
+              )}
+              {privateError && <p className="text-red-600 text-sm">{privateError}</p>}
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={submitPrivatePassword}
+                className="flex-1 bg-blue-600 text-white p-2.5 rounded-lg"
+              >
+                {privateMode === "create" ? "Set Password" : "Unlock"}
+              </button>
+              <button
+                onClick={closePrivateModal}
+                className="flex-1 bg-gray-300 text-gray-700 p-2.5 rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-gradient-custom">
         {/* Sidebar */}
         <aside className="w-full md:w-56 bg-white/90 border-r border-blue-100/50 backdrop-blur-sm p-5 shadow-sm flex flex-col">
@@ -806,13 +918,13 @@ function App() {
               className={`p-2.5 rounded-lg mb-2.5 cursor-pointer transition-colors ${page === "dashboard" ? "bg-blue-50" : ""}`}
               onClick={() => setPage("dashboard")}
             >
-              🏠 Home
+              Home
             </div>
             <div
               className={`p-2.5 rounded-lg mb-2.5 cursor-pointer transition-colors ${page === "private" ? "bg-blue-50" : ""}`}
-              onClick={() => setPage("private")}
+              onClick={openPrivateModal}
             >
-              🔒 Private
+              Private {privateUnlocked ? "(Unlocked)" : ""}
             </div>
           </div>
 
@@ -831,194 +943,208 @@ function App() {
 
         {/* Main content */}
         <main className="flex-1 p-5 overflow-auto">
-          <div className="flex justify-between items-center mb-3">
-            <div>
-              <h2 className="m-0 text-xl font-semibold">{page === "dashboard" ? "Home" : "Private Notes"}</h2>
-              <div className="text-sm text-gray-600">{page === "dashboard" ? "Your workspace" : "Private notes"}</div>
-            </div>
-
-            <div className="flex gap-2.5">
-              {undoNote && (
-                <button onClick={undoDelete} className="bg-blue-600 text-white p-2.5 rounded-lg cursor-pointer">
-                  Undo
-                </button>
-              )}
+          {page === "private" && !privateUnlocked ? (
+            <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
+              <p className="text-lg">Private notes are locked.</p>
               <button
-                className="bg-cyan-500 text-white p-2.5 rounded-lg cursor-pointer shadow-md"
-                onClick={() => {
-                  setIsPrivate(page === "private");
-                  setShowForm(true);
-                  setActiveNote(null);
-                  setTimeout(() => {
-                    if (editorRef.current) {
-                      editorRef.current.innerHTML = "";
-                      editorRef.current.focus();
-                    }
-                  }, 20);
-                }}
+                onClick={openPrivateModal}
+                className="mt-4 bg-blue-600 text-white px-6 py-2.5 rounded-lg"
               >
-                ＋ New note
+                Unlock Private Notes
               </button>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="flex justify-between items-center mb-3">
+                <div>
+                  <h2 className="m-0 text-xl font-semibold">{page === "dashboard" ? "Home" : "Private Notes"}</h2>
+                  <div className="text-sm text-gray-600">{page === "dashboard" ? "Your workspace" : "Private notes"}</div>
+                </div>
 
-          {showForm && (
-            <section className="bg-white border border-blue-50 rounded-xl p-4 mb-5 shadow-sm">
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Note title"
-                className="p-2.5 border border-blue-100 rounded-lg w-full mb-2"
-              />
-              <div className="flex gap-2 mb-2.5">
-                <button 
-                  type="button" 
-                  onClick={() => formatText("bold")} 
-                  className={`p-1.5 border border-blue-50 rounded-md cursor-pointer ${activeFormatting.bold ? 'format-btn-active' : ''}`}
-                >
-                  B
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => formatText("italic")} 
-                  className={`p-1.5 border border-blue-50 rounded-md cursor-pointer ${activeFormatting.italic ? 'format-btn-active' : ''}`}
-                >
-                  I
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => formatText("underline")} 
-                  className={`p-1.5 border border-blue-50 rounded-md cursor-pointer ${activeFormatting.underline ? 'format-btn-active' : ''}`}
-                >
-                  U
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => formatText("insertUnorderedList")} 
-                  className={`p-1.5 border border-blue-50 rounded-md cursor-pointer ${activeFormatting.list ? 'format-btn-active' : ''}`}
-                >
-                  • List
-                </button>
+                <div className="flex gap-2.5">
+                  {undoNote && (
+                    <button onClick={undoDelete} className="bg-blue-600 text-white p-2.5 rounded-lg cursor-pointer">
+                      Undo
+                    </button>
+                  )}
+                  <button
+                    className="bg-cyan-500 text-white p-2.5 rounded-lg cursor-pointer shadow-md"
+                    onClick={() => {
+                      setIsPrivate(page === "private");
+                      setShowForm(true);
+                      setActiveNote(null);
+                      setTimeout(() => {
+                        if (editorRef.current) {
+                          editorRef.current.innerHTML = "";
+                          editorRef.current.focus();
+                        }
+                      }, 20);
+                    }}
+                  >
+                    + New note
+                  </button>
+                </div>
               </div>
-              <div
-                ref={editorRef}
-                contentEditable
-                className="w-full min-h-[140px] border border-blue-50 rounded-lg p-2.5 bg-white outline-none"
-                aria-label="Note editor"
-                onInput={() => {
-                  // Content updates are now handled by the useEffect
-                }}
-              ></div>
-              <div className="mt-3 flex gap-2.5">
-                <button onClick={addNote} className="bg-blue-600 text-white p-2.5 rounded-lg cursor-pointer">
-                  {activeNote ? "Update" : "Save"}
-                </button>
-                <button onClick={resetForm} className="bg-red-500 text-white p-2.5 rounded-lg cursor-pointer">
-                  Cancel
-                </button>
-              </div>
-            </section>
-          )}
 
-          {!showForm && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
-              {getSortedNotes(currentNotes).map((n) => (
-                <article
-                  key={n.id}
-                  className="note-card border border-blue-50 p-3 rounded-xl shadow-sm cursor-pointer bg-white hover:shadow-md transition-transform duration-150 text-left"
-                  style={{ background: n.color }}
-                  onClick={() => {
-                    setActiveNote(n);
-                    setTitle(n.title);
-                    setIsPrivate(page === "private");
-                    setShowForm(true);
-                    setTimeout(() => {
-                      if (editorRef.current) {
-                        editorRef.current.innerHTML = n.content;
-                        editorRef.current.focus();
-                      }
-                    }, 40);
-                  }}
-                >
-                  <div className="flex justify-between items-start">
-                    <h3 className="m-0 text-base">{n.title}</h3>
-                    <div className="relative" ref={menuRef} onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className="border-none bg-transparent cursor-pointer text-lg"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenMenuId(openMenuId === n.id ? null : n.id);
-                        }}
-                      >
-                        ⋮
-                      </button>
-                      {openMenuId === n.id && (
-                        <div className="absolute top-7 right-0 bg-white border border-blue-50 rounded-lg shadow-lg w-56 z-9999 note-menu">
-                          {page === "dashboard" ? (
-                            <div
-                              className="p-2.5 cursor-pointer text-sm border-b border-gray-100"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                moveNote(n, true); // Move to private
-                                setOpenMenuId(null);
-                              }}
-                            >
-                              ⚙️ Process (Move to Private)
-                            </div>
-                          ) : (
-                            <div
-                              className="p-2.5 cursor-pointer text-sm border-b border-gray-100"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                moveNote(n, false); // Move to public
-                                setOpenMenuId(null);
-                              }}
-                            >
-                              ↩️ Unprocess (Move to Home)
+              {showForm && (
+                <section className="bg-white border border-blue-50 rounded-xl p-4 mb-5 shadow-sm">
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Note title"
+                    className="p-2.5 border border-blue-100 rounded-lg w-full mb-2"
+                  />
+                  <div className="flex gap-2 mb-2.5">
+                    <button 
+                      type="button" 
+                      onClick={() => formatText("bold")} 
+                      className={`p-1.5 border border-blue-50 rounded-md cursor-pointer ${activeFormatting.bold ? 'format-btn-active' : ''}`}
+                    >
+                      B
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => formatText("italic")} 
+                      className={`p-1.5 border border-blue-50 rounded-md cursor-pointer ${activeFormatting.italic ? 'format-btn-active' : ''}`}
+                    >
+                      I
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => formatText("underline")} 
+                      className={`p-1.5 border border-blue-50 rounded-md cursor-pointer ${activeFormatting.underline ? 'format-btn-active' : ''}`}
+                    >
+                      U
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => formatText("insertUnorderedList")} 
+                      className={`p-1.5 border border-blue-50 rounded-md cursor-pointer ${activeFormatting.list ? 'format-btn-active' : ''}`}
+                    >
+                      • List
+                    </button>
+                  </div>
+                  <div
+                    ref={editorRef}
+                    contentEditable
+                    className="w-full min-h-[140px] border border-blue-50 rounded-lg p-2.5 bg-white outline-none"
+                    aria-label="Note editor"
+                    onInput={() => {
+                      // Content updates are now handled by the useEffect
+                    }}
+                  ></div>
+                  <div className="mt-3 flex gap-2.5">
+                    <button onClick={addNote} className="bg-blue-600 text-white p-2.5 rounded-lg cursor-pointer">
+                      {activeNote ? "Update" : "Save"}
+                    </button>
+                    <button onClick={resetForm} className="bg-red-500 text-white p-2.5 rounded-lg cursor-pointer">
+                      Cancel
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {!showForm && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+                  {getSortedNotes(currentNotes).map((n) => (
+                    <article
+                      key={n.id}
+                      className="note-card border border-blue-50 p-3 rounded-xl shadow-sm cursor-pointer bg-white hover:shadow-md transition-transform duration-150 text-left"
+                      style={{ background: n.color }}
+                      onClick={() => {
+                        setActiveNote(n);
+                        setTitle(n.title);
+                        setIsPrivate(page === "private");
+                        setShowForm(true);
+                        setTimeout(() => {
+                          if (editorRef.current) {
+                            editorRef.current.innerHTML = n.content;
+                            editorRef.current.focus();
+                          }
+                        }, 40);
+                      }}
+                    >
+                      <div className="flex justify-between items-start">
+                        <h3 className="m-0 text-base">{n.title}</h3>
+                        <div className="relative" ref={menuRef} onClick={(e) => e.stopPropagation()}>
+                          <button
+                            className="border-none bg-transparent cursor-pointer text-lg"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(openMenuId === n.id ? null : n.id);
+                            }}
+                          >
+                            ⋮
+                          </button>
+                          {openMenuId === n.id && (
+                            <div className="absolute top-7 right-0 bg-white border border-blue-50 rounded-lg shadow-lg w-56 z-9999 note-menu">
+                              {page === "dashboard" ? (
+                                <div
+                                  className="p-2.5 cursor-pointer text-sm border-b border-gray-100"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveNote(n, true); // Move to private
+                                    setOpenMenuId(null);
+                                  }}
+                                >
+                                  Process (Move to Private)
+                                </div>
+                              ) : (
+                                <div
+                                  className="p-2.5 cursor-pointer text-sm border-b border-gray-100"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveNote(n, false); // Move to public
+                                    setOpenMenuId(null);
+                                  }}
+                                >
+                                  Unprocess (Move to Home)
+                                </div>
+                              )}
+                              <div
+                                className="p-2.5 cursor-pointer text-sm border-b border-gray-100"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteNote(n, page === "private");
+                                  setOpenMenuId(null);
+                                }}
+                              >
+                                Delete
+                              </div>
+                              <div
+                                className="p-2.5 cursor-pointer text-sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  togglePin(n, page === "private");
+                                }}
+                              >
+                                {n.pinned ? "Unpin" : "Pin"}
+                              </div>
                             </div>
                           )}
-                          <div
-                            className="p-2.5 cursor-pointer text-sm border-b border-gray-100"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteNote(n, page === "private");
-                              setOpenMenuId(null);
-                            }}
-                          >
-                            🗑️ Delete
-                          </div>
-                          <div
-                            className="p-2.5 cursor-pointer text-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              togglePin(n, page === "private");
-                            }}
-                          >
-                            {n.pinned ? "📌 Unpin" : "📌 Pin"}
-                          </div>
                         </div>
-                      )}
+                      </div>
+
+                      <div className="mt-2 note-content">{truncateContent(n.content)}</div>
+
+                      <div className="mt-2.5 flex justify-between items-center">
+                        <small className="text-gray-500">{new Date(n.created_at || n.createdAt).toLocaleString()}</small>
+                        {n.pinned && <small className="text-amber-700">Pinned</small>}
+                      </div>
+                    </article>
+                  ))}
+
+                  {currentNotes.length === 0 && (
+                    <div className="col-span-full text-center py-12 text-gray-500">
+                      <p className="m-0 text-base">No notes yet.</p>
+                      <p className="m-0">
+                        Click <strong>New note</strong> to create your first note.
+                      </p>
                     </div>
-                  </div>
-
-                  <div className="mt-2 note-content">{truncateContent(n.content)}</div>
-
-                  <div className="mt-2.5 flex justify-between items-center">
-                    <small className="text-gray-500">{new Date(n.created_at || n.createdAt).toLocaleString()}</small>
-                    {n.pinned && <small className="text-amber-700">Pinned</small>}
-                  </div>
-                </article>
-              ))}
-
-              {currentNotes.length === 0 && (
-                <div className="col-span-full text-center py-12 text-gray-500">
-                  <p className="m-0 text-base">No notes yet.</p>
-                  <p className="m-0">
-                    Click <strong>New note</strong> to create your first note.
-                  </p>
+                  )}
                 </div>
               )}
-            </div>
+            </>
           )}
         </main>
       </div>

@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../users/users.entity';
 
 @Entity('notes')
@@ -24,6 +24,10 @@ export class Note {
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
+  @Column({ name: 'userId' })
+  userId: number;
+
   @ManyToOne(() => User, (user) => user.notes)
+  @JoinColumn({ name: 'userId' })  
   user: User;
 }

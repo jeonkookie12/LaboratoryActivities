@@ -13,30 +13,28 @@ export class NotesController {
 
   @Get()
   async findAll(@Request() req) {
-    return this.notesService.findAll(req.user);
+    return this.notesService.findAll(req.user.sub);  
   }
 
   @Get(':id')
   async findOne(@Param('id') id: string, @Request() req) {
-    return this.notesService.findOne(+id, req.user);
+    return this.notesService.findOne(+id, req.user.sub);
   }
 
   @Post()
   @UsePipes(new ValidationPipe())
   async create(@Body() createNoteDto: CreateNoteDto, @Request() req) {
-    return this.notesService.create(createNoteDto, req.user);
+    return this.notesService.create(createNoteDto, req.user.sub);
   }
 
   @Put(':id')
   async update(@Param('id') id: string, @Body() updateNoteDto: UpdateNoteDto, @Request() req) {
-    return this.notesService.update(+id, updateNoteDto, req.user);
+    return this.notesService.update(+id, updateNoteDto, req.user.sub);
   }
-
 
   @Delete(':id')
   async delete(@Param('id') id: string, @Request() req) {
-    console.log('🗑️ Delete hit with id =', id, 'user =', req.user);
-    await this.notesService.delete(+id, req.user);
+    await this.notesService.delete(+id, req.user.sub);
     return { message: 'Note deleted' };
   }
 }

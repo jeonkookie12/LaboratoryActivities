@@ -18,4 +18,7 @@ export class User {
 
   @OneToMany(() => Note, (note) => note.user)
   notes: Note[];
+
+  @Column({ name: 'private_password_hash', nullable: true })
+  private_password_hash?: string;
 }

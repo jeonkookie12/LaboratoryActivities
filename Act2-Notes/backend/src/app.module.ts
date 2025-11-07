@@ -20,7 +20,7 @@ import { AuthModule } from './auth/auth.module';
         password: configService.get('DATABASE_PASSWORD'),
         database: configService.get('DATABASE_NAME'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: true, 
+
       }),
       inject: [ConfigService],
     }),

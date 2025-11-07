@@ -1,8 +1,12 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './users.entity';
-import { RegisterDto } from '../auth/dto/register.dto'; 
+import { RegisterDto } from '../auth/dto/register.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -14,6 +18,12 @@ export class UsersService {
 
   async findByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { email } });
+  }
+
+  async findOne(id: number): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    return user;
   }
 
   async create(registerDto: RegisterDto): Promise<User> {
@@ -31,5 +41,16 @@ export class UsersService {
       password: hashedPassword,
     });
     return this.usersRepository.save(user);
+  }
+
+
+  async update(id: number, updates: Partial<User>): Promise<void> {
+    const user = await this.usersRepository.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    Object.assign(user, updates);
+    await this.usersRepository.save(user); 
   }
 }
