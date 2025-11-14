@@ -40,7 +40,8 @@ function Weather() {
 
   // 🔹 Get weather data
   const getWeather = async (searchCity = city) => {
-    if (!searchCity.trim()) {
+    const trimmedCity = searchCity.trim();
+    if (!trimmedCity) {
       setError("⚠️ Please enter a city name.");
       return;
     }
@@ -48,25 +49,31 @@ function Weather() {
     try {
       setError("");
       setFade(true);
+
       const res = await fetch(
-        `http://localhost:3000/weather?city=${encodeURIComponent(searchCity)}`
+        `http://localhost:3000/weather?city=${encodeURIComponent(trimmedCity)}`
       );
+
+      if (!res.ok) throw new Error("Network response was not ok");
       const data = await res.json();
 
       if (data.error) {
-        setError("⚠️ City not found.");
+        setError(`⚠️ ${data.error}`);
         setFade(false);
-      } else {
-        setTimeout(() => {
-          setWeather(data);
-          setSelectedForecast(null);
-          setCity("");
-          setFade(false);
-          fetchRecentSearches();
-        }, 400);
+        return;
       }
-    } catch {
-      setError("⚠️ Unable to fetch weather data.");
+
+      // ✅ Smooth transition for updates
+      setTimeout(() => {
+        setWeather(data);
+        setSelectedForecast(null);
+        setCity("");
+        setFade(false);
+        fetchRecentSearches();
+      }, 400);
+    } catch (err) {
+      console.error("Fetch error:", err);
+      setError("⚠️ Unable to fetch weather data. Please try again later.");
       setFade(false);
     }
   };
@@ -117,7 +124,19 @@ function Weather() {
 
   const activeData = selectedForecast
     ? weather?.forecast?.[selectedForecast]
-    : weather;
+    : weather?.current;
+
+  // 🧩 Align today's forecast with current data
+  const todayStr = new Date().toISOString().split("T")[0];
+  const alignedForecast = weather?.forecast?.map((f) =>
+    f.date === todayStr
+      ? {
+          ...f,
+          temp: weather.current?.temperature,
+          description: weather.current?.description,
+        }
+      : f
+  );
 
   const formattedDate = new Date(
     selectedForecast && weather?.forecast?.[selectedForecast]?.date
@@ -131,7 +150,6 @@ function Weather() {
 
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-blue-100 text-gray-800 overflow-y-auto py-10">
-      {/* Smooth height transition for main container */}
       <div
         className={`w-[760px] max-w-[90%] bg-white rounded-3xl p-10 shadow-lg text-center border border-blue-100 
         flex flex-col transition-all duration-700 ease-in-out`}
@@ -139,7 +157,7 @@ function Weather() {
         <h1 className="text-2xl font-semibold mb-6 text-blue-700">Weather</h1>
 
         {/* 🔍 SEARCH BAR */}
-        <div className="flex flex-col items-start mb-5 relative w-full transition-all duration-500 ease-in-out">
+        <div className="flex flex-col items-start mb-5 relative w-full">
           <div className="flex gap-3 w-full relative">
             <div className="relative flex-1">
               <input
@@ -162,7 +180,7 @@ function Weather() {
 
               {/* 🕒 Dropdown Recent Searches */}
               {showSuggestions && filteredSuggestions.length > 0 && (
-                <div className="absolute left-0 z-20 w-full bg-white border border-gray-200 rounded-xl mt-1 shadow-md text-left transition-all duration-500 ease-in-out">
+                <div className="absolute left-0 z-20 w-full bg-white border border-gray-200 rounded-xl mt-1 shadow-md text-left">
                   <div className="px-4 py-3 border-b border-gray-100 text-xs font-semibold text-blue-500 uppercase tracking-wider">
                     Recent Searches
                   </div>
@@ -194,7 +212,7 @@ function Weather() {
             </button>
           </div>
 
-          {/* ❗ Error popup with smooth fade and height transition (full width) */}
+          {/* ❗ Error message */}
           <div
             className={`transition-all duration-500 ease-in-out overflow-hidden w-full ${
               error ? "max-h-20 opacity-100 mt-4" : "max-h-0 opacity-0 mt-0"
@@ -205,9 +223,9 @@ function Weather() {
             </div>
           </div>
 
-          {/* 🕒 STATIC RECENT SEARCHES */}
+          {/* 🕒 Static Recent Searches */}
           {!weather && (
-            <div className="mt-6 w-full text-left animate-fadeIn px-3 transition-all duration-500 ease-in-out">
+            <div className="mt-6 w-full text-left px-3">
               <h3 className="text-xs font-semibold mb-3 text-gray-500 uppercase tracking-wider">
                 Recent Searches
               </h3>
@@ -237,7 +255,7 @@ function Weather() {
           )}
         </div>
 
-        {/* 🌦️ WEATHER INFO */}
+        {/* 🌦️ WEATHER DISPLAY */}
         <div
           className={`flex flex-col justify-center items-center transition-all duration-500 py-6 ${
             fade ? "opacity-0 translate-y-3" : "opacity-100 translate-y-0"
@@ -265,19 +283,28 @@ function Weather() {
                 <h2 className="text-6xl font-light text-gray-800">
                   {Math.round(activeData.temp ?? activeData.temperature)}°
                 </h2>
-                <p className="capitalize text-gray-500 mt-3 text-sm">
+                <p className="capitalize text-gray-700 mt-3 text-sm">
                   {activeData.description}
                 </p>
+
+                {/* 🌡️ Show humidity & wind speed for selected forecast only */}
+                  {(!selectedForecast ||
+                  (weather?.forecast?.[selectedForecast]?.date === todayStr)) && (
+                  <div className="mt-3 text-sm text-gray-400 space-y-1 transition-all duration-500">
+                    <p>Humidity: {weather?.current?.humidity ?? ""}%</p>
+                    <p>Wind Speed: {weather?.current?.wind_speed ?? ""} km/h</p>
+                  </div>
+                )}
               </div>
 
               {/* 🌈 5-DAY FORECAST */}
-              <div className="border-t border-gray-100 pt-6 mt-8 w-full transition-all duration-700 ease-in-out">
+              <div className="border-t border-gray-100 pt-6 mt-8 w-full">
                 <h3 className="text-sm font-medium mb-5 text-gray-600 uppercase tracking-wider">
                   5-Day Forecast
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 w-full">
-                  {weather.forecast?.map((f, i) => {
+                  {alignedForecast?.map((f, i) => {
                     const isActive = selectedForecast === i;
                     return (
                       <div

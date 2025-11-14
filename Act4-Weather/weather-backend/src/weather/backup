@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from './database.service';
 
 
-export interface DailyForecast {   // 👈 Add 'export'
+interface DailyForecast {
   date: string;
   temp: number;
   description: string;
@@ -71,16 +71,15 @@ export class WeatherService {
 
     // === Return structured response ===
     return {
-     city: currentData.name,
-  current: {
-    temperature: currentData.main?.temp ?? 0,
-    description: currentData.weather?.[0]?.description ?? 'N/A',
-    feels_like: currentData.main?.feels_like ?? 0,
-    humidity: currentData.main?.humidity ?? 0,
-    wind_speed: currentData.wind?.speed ?? 0,
-    
-  },
-  forecast: dailyForecasts,
+      city: currentData.name,
+      current: {
+        temperature: currentData.main.temp,
+        description: currentData.weather[0].description,
+        feels_like: currentData.main.feels_like,
+        humidity: currentData.main.humidity,
+        wind_speed: currentData.wind.speed,
+      },
+      forecast: dailyForecasts,
     };
   }
 

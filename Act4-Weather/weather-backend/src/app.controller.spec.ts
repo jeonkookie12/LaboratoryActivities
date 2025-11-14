@@ -15,8 +15,8 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return a formal system status message', () => {
+      expect(appController.getHello()).toBe('✅ Weather API Server is running successfully.');
     });
   });
 });
