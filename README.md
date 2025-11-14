@@ -1,6 +1,6 @@
 #  Laboratory Activities 
 
-Welcome to the **LaboratoryActivity** repository! This project contains five 
+Welcome to the **LaboratoryActivities** repository! This project contains five 
 interactive web-based activities, each exploring different aspects of front-end development 
 and user experience design.
 
@@ -30,7 +30,7 @@ The Notepad Application is an easy-to-use tool made for writing and organizing n
 SJN Library works as an online spot set up for sorting through and digging into a bunch of books along with some special book category.
 
 ### Act4-Weather
-
+Weather Forecast works as an online spot set up for instantly checking live city weather details like temperature, humidity, and wind speed.
 
 ### Act5-BlogPlatform
 TRENDORA works as an online space made for sharing thoughts, posts, and conversations with others. 
