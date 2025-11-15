@@ -5,8 +5,13 @@ import { CategoriesModule } from './categories/categories.module';
 import { Category } from './category.entity';
 import { Book } from './book.entity';
 
+/**
+ * Root application module
+ * Configures the main application dependencies and database connection
+ */
 @Module({
   imports: [
+    // Configure TypeORM database connection to MySQL
     TypeOrmModule.forRoot({
       type: 'mysql',
       host: 'localhost',
@@ -14,11 +19,12 @@ import { Book } from './book.entity';
       username: 'root',
       password: '', 
       database: 'bookshelf',
-      entities: [Category, Book],
-      synchronize: true,
+      entities: [Category, Book], // Register entity classes
+      synchronize: true, // Automatically sync database schema (use with caution in production)
     }),
-    BooksModule,
-    CategoriesModule,
+    // Import feature modules
+    BooksModule,        // Book management functionality
+    CategoriesModule,  // Category/genre management functionality
   ],
 })
 export class AppModule {}

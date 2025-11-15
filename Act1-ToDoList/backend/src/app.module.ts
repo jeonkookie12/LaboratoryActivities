@@ -4,8 +4,13 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TasksModule } from './tasks/tasks.module';
 
+/**
+ * Root application module
+ * Configures the main application dependencies and database connection
+ */
 @Module({
   imports: [
+    // Configure TypeORM database connection to MySQL
     TypeOrmModule.forRoot({
       type: 'mysql',
       host: 'localhost',
@@ -13,8 +18,9 @@ import { TasksModule } from './tasks/tasks.module';
       username: 'root',
       password: '',
       database: 'activity',
-      autoLoadEntities: true, 
+      autoLoadEntities: true, // Automatically load entity files
     }),
+    // Import the Tasks module to enable task-related functionality
     TasksModule,
   ],
   controllers: [AppController],

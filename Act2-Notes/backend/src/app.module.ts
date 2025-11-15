@@ -7,9 +7,15 @@ import { UsersModule } from './users/users.module';
 import { NotesModule } from './notes/notes.module';
 import { AuthModule } from './auth/auth.module';
 
+/**
+ * Root application module
+ * Configures the main application dependencies, database connection, and feature modules
+ */
 @Module({
   imports: [
+    // Configure global ConfigModule to access environment variables
     ConfigModule.forRoot({ isGlobal: true }),
+    // Configure TypeORM database connection asynchronously using environment variables
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -19,14 +25,16 @@ import { AuthModule } from './auth/auth.module';
         username: configService.get('DATABASE_USER'),
         password: configService.get('DATABASE_PASSWORD'),
         database: configService.get('DATABASE_NAME'),
+        // Automatically load all entity files
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
 
       }),
       inject: [ConfigService],
     }),
-    UsersModule,
-    NotesModule,
-    AuthModule,
+    // Import feature modules
+    UsersModule,    // User management functionality
+    NotesModule,    // Notes management functionality
+    AuthModule,     // Authentication and authorization functionality
   ],
   controllers: [AppController],
   providers: [AppService],

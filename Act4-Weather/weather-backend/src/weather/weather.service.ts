@@ -2,13 +2,24 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from './database.service';
 
-
-export interface DailyForecast {   // 👈 Add 'export'
+/**
+ * Interface for daily forecast data
+ * Represents weather forecast for a single day
+ */
+export interface DailyForecast {
+  /** Date of the forecast */
   date: string;
+  /** Temperature in Celsius */
   temp: number;
+  /** Weather description */
   description: string;
 }
 
+/**
+ * Weather service
+ * Contains all business logic for weather data operations
+ * Integrates with OpenWeatherMap API and manages search history
+ */
 @Injectable()
 export class WeatherService {
   constructor(
@@ -16,6 +27,12 @@ export class WeatherService {
     private db: DatabaseService,
   ) {}
 
+  /**
+   * Retrieves current weather and 5-day forecast for a specified city
+   * Fetches data from OpenWeatherMap API and saves search to database
+   * @param {string} city - City name to get weather for
+   * @returns {Promise<any>} Weather data including current conditions and forecast
+   */
   async getWeather(city: string) {
     if (!city) return { error: 'City is required.' };
 
@@ -31,7 +48,7 @@ export class WeatherService {
       return { error: currentData.message || 'City not found.' };
     }
 
-    // Save search to database
+    // Save search to database for history tracking
     await this.db.addSearch(city);
 
     // === Fetch 5-day forecast ===
@@ -44,6 +61,7 @@ export class WeatherService {
     }
 
     // === Process and group forecast data ===
+    // Extract one forecast per day (5 days total)
     const seenDates = new Set<string>();
     const dailyForecasts: DailyForecast[] = [];
 
@@ -71,19 +89,22 @@ export class WeatherService {
 
     // === Return structured response ===
     return {
-     city: currentData.name,
-  current: {
-    temperature: currentData.main?.temp ?? 0,
-    description: currentData.weather?.[0]?.description ?? 'N/A',
-    feels_like: currentData.main?.feels_like ?? 0,
-    humidity: currentData.main?.humidity ?? 0,
-    wind_speed: currentData.wind?.speed ?? 0,
-    
-  },
-  forecast: dailyForecasts,
+      city: currentData.name,
+      current: {
+        temperature: currentData.main?.temp ?? 0,
+        description: currentData.weather?.[0]?.description ?? 'N/A',
+        feels_like: currentData.main?.feels_like ?? 0,
+        humidity: currentData.main?.humidity ?? 0,
+        wind_speed: currentData.wind?.speed ?? 0,
+      },
+      forecast: dailyForecasts,
     };
   }
 
+  /**
+   * Retrieves the recent search history from the database
+   * @returns {Promise<any[]>} Array of recent weather searches
+   */
   async getSearchHistory() {
     return this.db.getRecentSearches();
   }
