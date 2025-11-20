@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as mysql from 'mysql2/promise';
 
 /**
@@ -10,17 +11,19 @@ import * as mysql from 'mysql2/promise';
 export class DatabaseService implements OnModuleInit {
   private connection: mysql.Connection;
 
+  constructor(private configService: ConfigService) {}
+
   /**
    * Initializes database connection and creates search_history table if it doesn't exist
    * Called automatically when the module is initialized
    */
   async onModuleInit() {
-    // Create MySQL connection
+    // Create MySQL connection using environment variables
     this.connection = await mysql.createConnection({
-      host: 'localhost',
-      user: 'root', // or your DB user
-      password: '', // your MySQL password
-      database: 'weather_db',
+      host: this.configService.get('DATABASE_HOST'),
+      user: this.configService.get('DATABASE_USER'),
+      password: this.configService.get('DATABASE_PASSWORD'),
+      database: this.configService.get('DATABASE_NAME'),
     });
 
     // Create search_history table if it doesn't exist
